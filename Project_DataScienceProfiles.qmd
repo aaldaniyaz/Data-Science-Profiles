@@ -1,0 +1,464 @@
+---
+title: "Project - Data Science Profiles"
+format:   
+  html: 
+    toc: true
+    toc-depth: 3
+    standalone: true
+    embed-resources: true
+    code-fold: true
+    number-sections: true
+---
+
+```{r}
+#| label: packages-data
+#| message: false
+library(tidyverse)
+library(patchwork)            
+library(tidymodels)
+library(readxl)
+library(glue)
+library(corrplot)
+library(dplyr)
+profiles_2024 <- read_xlsx("~/github_repositories/R/HW2/Project_DataScienceProfiles_aaldaniyaz/Data Science Profile(1-15).xlsx")
+profiles <- read_csv("~/github_repositories/R/HW2/Project_DataScienceProfiles_aaldaniyaz/Data Science Profiles.csv")
+```
+
+
+## My Data Science Profile {#sec-1}
+
+I am **Alua**.
+
+![Alua Aldaniyaz](photo.jpeg){height=100}
+
+This is my Data Science Profile:
+
+```{r}
+#| label: my-profile
+profile_Alua <- profiles_2024 |> pivot_longer(cols = c(`Social Science`,`Business`,`Data Visualization`,`Statistics`, `Mathematics`, `Programming`, `Machine Learning`), names_to = "names", values_to = "values") |> filter(Name == 'Alua Aldaniyaz')
+profile_Alua |> mutate(Dimension_ordered = names |> fct_inorder() |> fct_rev()) |>
+  ggplot(aes(x = values, y = Dimension_ordered, fill = Dimension_ordered)) +
+  geom_col() + 
+  labs(title = "Alua's Data Science profile", caption = "Source: Self-assessment 2024",
+       x = "Values",
+       y = "Dimensions") + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_fill_brewer(palette = "Pastel1") + theme_minimal(base_size = 10) + theme(legend.position = "none") 
+```
+
+**Background of my top data science skills:** *I have been working in oil and gas industry for the last 5 years. During this period I gained extensive experience in providing oil and gas service, which gave me a great understanding of oil business. Moreover, I gained knowledge regarding data visualization as I also worked as Data Acquisition Engineer. *
+
+**Next things I want to learn in data science:** *I want to learn data analysis and machine learning*
+
+
+## Average Profile of the Study Program {#sec-2}
+
+```{r}
+#| label: profiles_all_long
+profiles_selected_2024 <- profiles_2024 |> mutate(Year = as.numeric("2024"), Type = if_else(Name == "Jan Lorenz" | Name == "Leona Hasani", "Instructor", "Student")) |> select(Year, `Social Science`:`Machine Learning`, Type,Name) #only required info from 2024 cohort
+profiles_all <- bind_rows(profiles, profiles_selected_2024) #It was important to change year column to numeric - combined data for 2 cohorts 
+profiles_long <- profiles_all |> pivot_longer(cols = c(`Social Science`:`Machine Learning`), names_to = "Dimensions", values_to = "Values") |> mutate(Dimension_ordered_all = Dimensions |> fct_inorder() |> fct_rev()) 
+```
+
+
+We have data from `r nrow(profiles_all)` students and instructors from the years `r NA` to  `r NA`. 
+
+Averaging all dimensions gives us the profile of the Study Program:
+
+```{r}
+#| label: program_profile
+profiles_long |> summarize(profiles_long_sum = mean(Values, na.rm = TRUE), .by = Dimension_ordered_all) |> 
+  ggplot(aes(x = profiles_long_sum, y = Dimension_ordered_all, fill = Dimension_ordered_all)) +
+  geom_col() + 
+  labs(title = "Data Science profile of the average member", caption = "Source: Self-assessment 2021-2024",
+       x = "Values",
+       y = "Dimensions") + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_fill_brewer(palette = "Pastel1") + theme_minimal(base_size = 10) + theme(legend.position = "none") 
+
+```
+
+**The average member of the study program:** *Programming and Machine learning the least known discipines for the average member of the data science course*
+
+
+### Different Cohorts {#sec-2.1}
+
+```{r}
+#| label: cohorts
+grouped_data <- profiles_long |> 
+  group_by(Year,Dimension_ordered_all) |> summarize(profiles_long_sum_by_cohorts = mean(Values, na.rm = TRUE)) 
+grouped_data |> ggplot(aes(x = profiles_long_sum_by_cohorts, y = Dimension_ordered_all, fill = Dimension_ordered_all)) +
+  geom_col() + facet_wrap(~ Year, ncol = 4) +
+  labs(title = "Data Science profile of the average member in different cohorts", caption = "Source: Self-assessment 2021-2024",
+       x = "Values",
+       y = "Dimensions") + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_fill_brewer(palette = "Pastel1") + theme_minimal(base_size = 10) + theme(legend.position = "none") 
+
+#Need to check how to visualize to compare in 1 dimension for 3 diff years 
+```
+
+**Trends for the profile of the average member:** *From the graph above it can clearly be seen that Programming and Mashine learning disciplines were the weakest among all 4 cohorts from 2021 to 2024. Also we can observe that in year 2024 overall value for Statistics has dropped in comparison to previous years. *
+
+
+### Students and Instructors {#sec-2.2}
+
+```{r}
+#| label: students_instructors
+students_instructors <- profiles_long |> 
+  group_by(Type,Dimension_ordered_all) |> summarize(profiles_long_sum_by_type = mean(Values, na.rm = TRUE)) 
+students_instructors |> ggplot(aes(x = profiles_long_sum_by_type, y = Dimension_ordered_all, fill = Dimension_ordered_all)) +
+  geom_col() + facet_wrap(~ students_instructors$Type, ncol = 2) +
+  labs(title = "Data Science profile of the average student and instructor", caption = "Source: Self-assessment 2021-2024",
+       x = "Values",
+       y = "Dimensions") + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_fill_brewer(palette = "Pastel1") + theme_minimal(base_size = 10) + theme(legend.position = "none") 
+
+```
+
+**Difference between average instructors and students:** *Instructors have less exposure in business dimension compared to students. However, instructors overall have higher level of knowledge in all other dimensions than students*
+
+
+## Dimension Analysis {#sec-3}
+
+Here we take a closer look at the distribution of competences concerning the different dimensions.  
+
+
+### Bar plots {#sec-3.1}
+
+```{r}
+#| label: dimensions-distribution
+#| fig-height: 12
+#| fig-width: 16
+profiles_long |>
+  ggplot(aes(x = Values, fill = Dimension_ordered_all)) + geom_bar() + facet_wrap(~ fct_rev(Dimension_ordered_all), ncol = 7, scales = "free_y") + 
+  labs(title = "Dimension distribution", caption = "Source: Self-assessment 2021-2024",
+       x = "Values",
+       y = "Number of people") + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) 
+
+```
+
+**Assessment of diversity/uniformity of competences:** *The competences show moderate diversity, with Machine Learning standing out as less diverse (clustered at lower values) and other dimensions exhibiting a more even spread, suggesting that skills are more evenly distributed among the other areas. There is a combination of both diversity and uniformity, depending on the dimension being assessed.* 
+
+
+### Summary Statistics: Central Tendency and Dispersion {#sec-3.2}
+
+```{r}
+#| label: summary-statistics
+#| fig-height: 16
+#| fig-width: 20
+profiles_long |> summarize(mean = round(mean(Values),1), standard_deviation = round(sd(Values),1), median = median(Values), quantile1 = round(quantile(Values, 0.25),1), quantile3 = round(quantile(Values, 0.75),1), IQR = round(IQR(Values),1), .by = Dimension_ordered_all) |> knitr::kable()
+
+```
+
+**Most diverse dimensions:** *The mean and median are relatively close, suggesting a fairly balanced dataset without extreme outliers. However, since the mean is slightly lower for Social Science and Data Visualization, we know there may be a few low scores pulling it down. The opposite is for other disciplines, where mean is slightly higher, which means that there are several high values for Statistics,Mathematics, Maschine Learning and Programming. Standard deviation shows that scores are somewhat slightly spread around the average, but overall dataset is fairly equally distributed. Overall, Social Science, Data Visualisation and Machine Learning are the most diverse dimensions.* 
+
+
+### Correlation of Dimensions {#sec-3.3}
+
+These are the pairwise Pearson correlation coefficients:  
+
+```{r}
+#| label: correlation
+#install.packages("corrr")
+library(corrr)
+profiles_all |> select(`Social Science`:`Machine Learning`) |> correlate() |> rplot(print_cor = TRUE)
+```
+
+**Which dimensions are positively correlated?** *Mathematics and statistics have some moderate positive correlation, programming and mathematics and programming and machine learning have little bit higher positive correlation.*
+
+**Which dimensions are negatively correlated?** *Only Programming and Business show some moderate negative correlation*
+
+
+## Data Audit, Normalizing Dimensions {#sec-4}
+
+
+### Detecting the change in the survey answering scales {#sec-4.1}
+
+When did the Online Survey change to answering scales from 0 to 10 to 1 to 10?
+
+```{r}
+#| label: data-audit
+profiles_all |> group_by(Year) |> summarize('Rating Scale Start' = min(c_across(`Social Science`:`Machine Learning`), na.rm = TRUE))
+```
+
+*In 2021 and 2022 Rating scale started with 0 and in 2023 and 2024 scale started with 1 *
+
+
+### Normalization idea {#sec-4.2}
+
+**New variable:** *It is possible to find the highest value across all disciplines for 1 person and set to it the value 10.*
+
+**Drawbacks of it:** *Not clear whether other values for the rest of disciplines should be recalculated proporionally. Normalization may reduce the ability to compare profiles accurately, especially for individuals whose maximum competencies were genuinely 10.*
+
+**Which rating scales is prefereable 0-10 or 1-10?** *In my opinion, rating scale of 0-10 is more representative in terms of the subjects that you have no experience at all. And also Many other scales (e.g., percentage) start from zero, which makes interpretation more intuitive.*
+
+
+## Principal Component Analysis {#sec-5}
+
+The principal component analysis gives a more detailed description of how dimensions go together. 
+
+```{r}
+#| label: PCA
+PCA <- profiles_all |> select(`Social Science`:`Machine Learning`) |> prcomp(scale. = TRUE) |> print()
+
+```
+
+The standard deviations are: `r PCA$sdev`
+
+The corresponding variances are: `r PCA$sdev^2`
+
+The total sum of variance of all principal components is the same as the total variance of the standardized dimensions: `r sum(PCA$sdev^2)`
+
+The percentages each PC explains of the total variance are: `r percent(PCA$sdev^2/sum(PCA$sdev^2))` 
+
+The cumulative percentages which the first principle components explains are: `r cumsum(PCA$sdev^2/sum(PCA$sdev^2))`. 
+
+
+### Variance Explained {#sec-5.1}
+
+```{r}
+#| label: explained_variance
+explained_variance <- tibble(PC = 1:7, Variance = c(PCA$sdev^2)) |> 
+  mutate(Cumulative = cumsum(Variance/sum(Variance)))|> print()
+                                                                                     
+# Plotting the explained variance and cumulative variance
+ggplot(explained_variance, aes(x = PC)) +
+  geom_col(aes(y = Variance), fill = "skyblue") +
+  geom_line(aes(y = Cumulative), color = "lightpink", size = 1) +
+  geom_point(aes(y = Cumulative), color = "lightpink", size = 2) +
+  labs(title = "Variance Explained by Each Principal Component",
+    x = "Principal Component",
+    y = "Variance") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.25, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  ) + scale_x_continuous(breaks = seq(1, 7, by = 1)) + scale_y_continuous(breaks = seq(0, 3, by = 0.25))
+
+
+```
+
+With the first 3 principal components we can explain *75*% of the standardized variance of the seven dimensions
+
+
+### The first three Pricipal Component vectors {#sec-5.2}
+
+```{r}
+#| label: PCs
+PC <- as_tibble(PCA$rotation, rownames = "Dimension") |> mutate(Dimension_ord = Dimension |> fct_inorder() |> fct_rev()) |> pivot_longer(cols = c(PC1:PC3), names_to = "PC", values_to = "Values")
+PC |> ggplot(aes(x = Dimension_ord, y = Values, fill = PC)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ PC, nrow = 1) +  # Facet each PC in a single row
+  labs(title = "First Three Principal Component Vectors",
+       x = "Dimension",
+       y = "Value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+#PC |> ggplot(aes(x = Values, y = Dimension_ord, fill = Dimension_ord)) + geom_col() + facet_wrap(~ PC, nrow = 3, scales = "free_y") + 
+ # labs(title = "PC vectors", caption = "Source: Self-assessment 2021-2024",
+  #     x = "Values",
+    #   y = "Dimensions") 
+
+```
+
+**PC1: *Mathematical skills* ** *High value in PC1 indicates strong quantitative and computational skills, as it is heavily weighted on dimensions like Machine Learning, Mathematics, Statistics, and Programming.*
+
+**PC2: *Business and social sciences knowledge* ** *A high PC2 value suggests that the individual has competencies in areas that require understanding of human behavior, management, and social factors.* 
+
+**PC3: *Business in tech field* ** *High PC3 values shows high experience in business world but associated with mathematics and statistics, which could be related to technical spheres*
+
+
+### Individuals in Principal Component coordinates {#sec-5.3}
+
+The following plots locate every member in scatter plots with respect to PC1, PC2 and PC3.
+
+```{r}
+
+
+# Step 1: Prepare the data frame
+# Ensure that `First_Name` is created explicitly
+PCA_df <- PCA$x |> 
+  as_tibble() |> 
+  bind_cols(profiles_all) 
+
+# Check if `Name` column exists
+if("Name" %in% colnames(PCA_df)) {
+  # Create `First_Name` by extracting the first word of `Name`
+  PCA_df <- PCA_df %>% mutate(First_Name = word(Name, 1))
+} else {
+  stop("The `Name` column does not exist in `profiles_all` or `PCA_df`.")
+}
+
+# Step 2: Verify that `First_Name` exists in `PCA_df`
+print(head(PCA_df))  # This should now show `First_Name`
+
+# Step 3: Create the plot
+ggplot(PCA_df, aes(x = PC1, y = PC2)) + 
+  geom_point(color = "blue") + 
+  geom_label(aes(label = First_Name), size = 3, vjust = -1) +
+  labs(title = "Individuals in PC1 and PC2 Coordinates",
+       x = "PC1",
+       y = "PC2") +
+  theme_minimal()
+
+```
+
+```{r}
+#| label: data_in_PC1_PC2_coordinates
+# Step 1: Prepare the data frame
+# Ensure that `First_Name` is created explicitly
+PCA_df <- PCA$x |> 
+  as_tibble() |> 
+  bind_cols(profiles_all) 
+
+# Check if `Name` column exists
+if("Name" %in% colnames(PCA_df)) {
+  # Create `First_Name` by extracting the first word of `Name`
+  PCA_df <- PCA_df %>% mutate(First_Name = word(Name, 1))
+} else {
+  stop("The `Name` column does not exist in `profiles_all` or `PCA_df`.")
+}
+
+# Step 2: Verify that `First_Name` exists in `PCA_df`
+print(head(PCA_df))  # This should now show `First_Name`
+
+# Step 3: Create the plot
+ggplot(PCA_df, aes(x = PC2, y = PC3)) + 
+  geom_point(color = "red") + 
+  geom_label(aes(label = First_Name), size = 3, vjust = -1) +
+  labs(title = "Individuals in PC1 and PC2 Coordinates",
+       x = "PC2",
+       y = "PC3") +
+  theme_minimal()
+
+```
+
+```{r}
+#| label: data_in_PC1_PC3_coordinates
+# Step 1: Prepare the data frame
+# Ensure that `First_Name` is created explicitly
+PCA_df <- PCA$x |> 
+  as_tibble() |> 
+  bind_cols(profiles_all) 
+
+# Check if `Name` column exists
+if("Name" %in% colnames(PCA_df)) {
+  # Create `First_Name` by extracting the first word of `Name`
+  PCA_df <- PCA_df %>% mutate(First_Name = word(Name, 1))
+} else {
+  stop("The `Name` column does not exist in `profiles_all` or `PCA_df`.")
+}
+
+# Step 2: Verify that `First_Name` exists in `PCA_df`
+print(head(PCA_df))  # This should now show `First_Name`
+
+# Step 3: Create the plot
+ggplot(PCA_df, aes(x = PC1, y = PC3)) + 
+  geom_point(color = "green") + 
+  geom_label(aes(label = First_Name), size = 3, vjust = -1) +
+  labs(title = "Individuals in PC1 and PC2 Coordinates",
+       x = "PC1",
+       y = "PC3") +
+  theme_minimal()
+
+```
+
+**My profile in PC coordinates:** *PC2 and PC3 for me show high values, whereas PC1 is low. I have experience in bussines in tech field and have some knowledge of social sciences, but I have very low expertise in math skills. * 
+
+
+## Linear Models to explain Programming {#sec-6}
+
+Here we explore the linear relationships with the goal to explain and predict the value individuals assign to the profile dimension Programming.  
+
+
+### Using Mathematics, Data Visualization, and Machine Learning {#sec-6.1}
+
+First we explore the linear relationships with three scatterplots. 
+
+```{r}
+#| label: lm-plotting
+math <- profiles_all |> ggplot(aes(x = Mathematics, y = Programming)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm") +
+  labs(title = "Programming vs. Mathematics",
+       x = "Mathematics", y = "Programming") +
+  theme_minimal() + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_y_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10))
+dv <- profiles_all |> ggplot(aes(x = `Data Visualization`, y = Programming)) +
+  geom_point(alpha = 0.2, color = "lightgreen") +
+  geom_smooth(method = "lm", color = "green") +
+  labs(title = "Programming vs. Data Vizualization",
+       x = "Data Vizualization", y = "Programming") +
+  theme_minimal() + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_y_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10))
+ml <- profiles_all |> ggplot(aes(x = `Machine Learning`, y = Programming)) +
+  geom_point(alpha = 0.2, color = "lightpink") +
+  geom_smooth(method = "lm", color = "pink") +
+  labs(title = "Programming vs. Machine Learning",
+       x = "Machine Learning", y = "Programming") +
+  theme_minimal() + scale_x_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10)) + scale_y_continuous(limits = c(0,10), minor_breaks = NULL, breaks = c(0:10))
+math + dv + ml 
+
+
+```
+
+**Qualitative Results:** *All three predictor variables—Mathematics, Data Visualization, and Machine Learning—show a positive dependence on Programming. This means that as values in these predictors increase, the level of Programming also tends to increase.
+
+Strongest Positive Association: Among the three variables, Machine Learning and Mathematics have the steepest slope in its linear regression line, indicating that greater involvement in Machine Learning or Math is most strongly associated with higher levels of Programming.* 
+
+```{r}
+#| label: mathdvml_mod
+Math_mod <- summary(lm(Programming ~ Mathematics, data = profiles_all)) |> print()
+dv_mod <- summary(lm(Programming ~ profiles_all$`Data Visualization`, data = profiles_all)) |> print()
+ml_mod <- summary(lm(Programming ~ profiles_all$`Machine Learning`, data = profiles_all)) |> print()
+mathdvml_mod <- summary(lm(Programming ~ profiles_all$`Machine Learning` + profiles_all$`Data Visualization` + Mathematics, data = profiles_all)) |> print()
+```
+
+**One predictor models:** 
+
+**Mathematics:** When Mathematics increases by 1 unit, Programming increases on average by *0.67* units.  
+
+**Data Visualization:** When Data Visualization increases by 1 unit, Programming increases on average by *0.33* units.   
+**Machine Learning:** When Machine Learning increases by 1 unit, Programming increases on average by *0.65* units.   
+
+**Three predictor model:** *Replace with interpretation text!*
+
+**Coefficients of determination:** The coefficients of determination are for Mathematics *0.38*, Data Visualization *0.1*, Machine Learning *0.39*, and for all three predictors *0.59*.
+
+
+### Using Statistics and Type  {#sec-6.2}
+
+First we explore the linear relationships with two scatter plots, one using color to distinguish between instructors and students and one without. 
+
+```{r}
+#| label: stattype
+stat <- profiles_all |> ggplot(aes(x = Statistics, y = Programming)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm") +
+  labs(title = "Programming vs. Statistics",
+       x = "Statistics", y = "Programming") +
+  theme_minimal() 
+stattype <- profiles_all |> ggplot(aes(x = Statistics, y = Programming, color = Type)) +
+  geom_point(alpha = 0.2) + geom_smooth(method = "lm") +
+  labs(title = "Programming vs. Statistics",
+       x = "Statistics", y = "Programming") +
+  theme_minimal() 
+stattype + stat
+
+```
+
+**Qualitative Results:** *Replace with your text!*
+
+```{r}
+#| label: stattype_mod
+stat_mod <- summary(lm(Programming ~ profiles_all$Statistics, data = profiles_all)) |> print()
+type_mod <- summary(lm(Programming ~ profiles_all$Type, data = profiles_all)) |> print()
+stattype_mod <- summary(lm(Programming ~ profiles_all$Statistics + profiles_all$Type, data = profiles_all)) |> print()
+stattypeint_mod <- summary(lm(Programming ~ profiles_all$Statistics * profiles_all$Type, data = profiles_all)) |> print()
+
+```
+
+**Quantitative Results Coefficients for the four models by predictors**
+
+**Statistic:** When Statistics increases by 1 unit, Programming increases on average by *0.46* units.
+
+**Type:** When the type is Instructor (the reference category) Programming is on average *6.6667*. When the type changes to Student it is *2.8824* less. That means the average student has Programming on average at *3.7843*. 
+
+**Statistics and Type:** In the model with Statistics and Type only as a main effect the coefficient for Statistics is *0.3887* and the reduction of intercept through the Type Student is *2.1456.*. 
+
+**Statistics and Type and their interaction:** When the interaction effect is added the main coefficient of Statistics turns negative to account for the negative association for the Instructors (the reference category). The main intercept is even higher and the main effect of Type Students is even more negative. The slope of Statistics for Instructors is *-0.3048* and this increases by *0.7785* for students. So, the slope of Statistics for Students is *0.4737*. 
